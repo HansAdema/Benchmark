@@ -5,9 +5,7 @@
 # * http://www.serverbear.com
 # * https://github.com/Crowd9/Benchmark
 #
-FROM ubuntu:14.04
-
-MAINTAINER Kyle Manna <kyle@kylemanna.com>
+FROM ubuntu:18.04
 
 ENV DEBIAN_FRONTEND noninteractive
 

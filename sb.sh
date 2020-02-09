@@ -1,25 +1,6 @@
 #!/bin/bash
 # Copyright (C) 2012 Crowd9 Pty Ltd
 
-usage ()
-{
-     echo >&2 "usage: bash $0 'john@example.com' 'MyBox' 'MyProvider.com' [\\\$20/mth]"
-}
-
-if [ $# -lt 3 ]
-then
-  usage
-  exit 1
-fi
-
-rm sb.sh
-
-HOST=$1
-PLAN=$2
-EMAIL=$3
-COST=$4
-PRIVATE=$5
-
 echo "
 ###############################################################################
 #               ServerBear (http://serverbear.com) benchmarker                #
@@ -37,7 +18,7 @@ To improve consistency, we recommend that you stop any services you may be runni
 WARNING: You run this script entirely at your own risk.
 ServerBear accepts no responsibility for any damage this script may cause.
 
-Please review the code at https://github.com/Crowd9/Benchmark if you have any concerns"
+Please review the code at https://github.com/HansAdema/Benchmark if you have any concerns"
 
 echo "Checking for required dependencies"
 
@@ -59,6 +40,8 @@ if [ `which apt-get >/dev/null 2>&1; echo $?` -ne 0 ]; then
   requires 'yum list installed libaio-devel' 'libaio-devel'
   requires 'yum list installed gcc-c++' 'gcc-c++'
   requires 'perl -MTime::HiRes -e 1' 'perl-Time-HiRes'
+  requires 'yum list installed ioping' 'ioping'
+  requires 'yum list installed fio' 'fio'
 else
   PACKAGE_MANAGER='apt-get'
   MANAGER_OPTS='--fix-missing'
@@ -67,6 +50,8 @@ else
   requires 'dpkg -s build-essential' 'build-essential'
   requires 'dpkg -s libaio-dev' 'libaio-dev'
   requires 'perl -MTime::HiRes -e 1' 'perl'
+  requires 'dpkg -s ioping' 'ioping'
+  requires 'dpkg -s fio' 'fio'
 fi
 
 rm -rf sb-bench
@@ -94,11 +79,6 @@ fi
 PID=`cat ~/.sb-pid 2>/dev/null`
 UNIX_BENCH_VERSION=5.1.3
 UNIX_BENCH_DIR=UnixBench-$UNIX_BENCH_VERSION
-IOPING_VERSION=0.6
-IOPING_DIR=ioping-$IOPING_VERSION
-FIO_VERSION=2.0.9
-FIO_DIR=fio-$FIO_VERSION
-UPLOAD_ENDPOINT='http://promozor.com/uploads.text'
 
 # args: [name] [target dir] [filename] [url]
 function require_download() {
@@ -193,24 +173,19 @@ echo "dd 64kx16k dsync: \`dd if=/dev/zero of=sb-io-test bs=64k count=16k oflag=d
 rm -f sb-io-test
 
 echo "Running IOPing I/O benchmark..."
-cd $IOPING_DIR
-make >> ../sb-output.log 2>&1
-echo "IOPing I/O: \`./ioping -c 10 . 2>&1 \`
-IOPing seek rate: \`./ioping -RD . 2>&1 \`
-IOPing sequential: \`./ioping -RL . 2>&1\`
-IOPing cached: \`./ioping -RC . 2>&1\`" >> ../sb-output.log
+echo "IOPing I/O: \`ioping -c 10 . 2>&1 \`
+IOPing seek rate: \`ioping -RD . 2>&1 \`
+IOPing sequential: \`ioping -RL . 2>&1\`
+IOPing cached: \`ioping -RC . 2>&1\`" >> ../sb-output.log
 cd ..
 
 echo "Running FIO benchmark..."
-cd $FIO_DIR
-make >> ../sb-output.log 2>&1
-
 echo "FIO random reads:
-\`./fio reads.ini 2>&1\`
+\`fio reads.ini 2>&1\`
 Done" >> ../sb-output.log
 
 echo "FIO random writes:
-\`./fio writes.ini 2>&1\`
+\`fio writes.ini 2>&1\`
 Done" >> ../sb-output.log
 
 rm sb-io-test 2>/dev/null
@@ -228,12 +203,13 @@ echo "Running bandwidth benchmark..."
 download_benchmark 'Cachefly' 'http://cachefly.cachefly.net/100mb.test'
 download_benchmark 'Linode, Atlanta, GA, USA' 'http://speedtest.atlanta.linode.com/100MB-atlanta.bin'
 download_benchmark 'Linode, Dallas, TX, USA' 'http://speedtest.dallas.linode.com/100MB-dallas.bin'
-download_benchmark 'Linode, Tokyo, JP' 'http://speedtest.tokyo.linode.com/100MB-tokyo.bin'
+download_benchmark 'Linode, Tokyo, JP' 'http://speedtest.tokyo2.linode.com/100MB-tokyo.bin'
 download_benchmark 'Linode, London, UK' 'http://speedtest.london.linode.com/100MB-london.bin'
+download_benchmark 'Linode, Sydney, Australia' 'http://speedtest.syd1.linode.com/100MB-london.bin'
 download_benchmark 'OVH, Paris, France' 'http://proof.ovh.net/files/100Mio.dat'
 download_benchmark 'SmartDC, Rotterdam, Netherlands' 'http://mirror.i3d.net/100mb.bin'
-download_benchmark 'Hetzner, Nuernberg, Germany' 'http://hetzner.de/100MB.iso'
-download_benchmark 'iiNet, Perth, WA, Australia' 'http://ftp.iinet.net.au/test100MB.dat'
+download_benchmark 'Hetzner, Nuernberg, Germany' 'https://speed.hetzner.de/100MB.bin'
+#download_benchmark 'iiNet, Perth, WA, Australia' 'http://ftp.iinet.net.au/test100MB.dat'
 download_benchmark 'Leaseweb, Haarlem, NL' 'http://mirror.nl.leaseweb.net/speedtest/100mb.bin'
 download_benchmark 'Leaseweb, Manassas, VA, USA' 'http://mirror.us.leaseweb.net/speedtest/100mb.bin'
 download_benchmark 'Softlayer, Singapore' 'http://speedtest.sng01.softlayer.com/downloads/test100.zip'
@@ -252,13 +228,7 @@ cd $UNIX_BENCH_DIR
 ./Run -c 1 -c `grep -c processor /proc/cpuinfo` >> ../sb-output.log 2>&1
 cd ..
 
-RESPONSE=\`curl -s -F "upload[upload_type]=unix-bench-output" -F "upload[data]=<sb-output.log" -F "upload[key]=$EMAIL|$HOST|$PLAN|$COST" -F "private=$PRIVATE" $UPLOAD_ENDPOINT\`
-
-echo "Uploading results..."
-echo "Response: \$RESPONSE"
-echo "Completed! Your benchmark has been queued & will be delivered in a jiffy."
 kill -15 \`ps -p \$\$ -o ppid=\` &> /dev/null
-rm -rf ../sb-bench
 rm -rf ~/.sb-pid
 
 exit 0
