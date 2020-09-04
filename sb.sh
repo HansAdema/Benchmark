@@ -80,7 +80,6 @@ PID=`cat ~/.sb-pid 2>/dev/null`
 UNIX_BENCH_VERSION=5.1.3
 UNIX_BENCH_DIR=UnixBench-$UNIX_BENCH_VERSION
 FIO_DIR=fio
-IOPING_VERSION=0.6
 
 # args: [name] [target dir] [filename] [url]
 function require_download() {
@@ -92,6 +91,8 @@ function require_download() {
 
 require_download UnixBench $UNIX_BENCH_DIR https://github.com/HansAdema/Benchmark/raw/master/UnixBench$UNIX_BENCH_VERSION-patched.tgz
 mv -f UnixBench $UNIX_BENCH_DIR 2>/dev/null
+
+mkdir $FIO_DIR
 
 cat > $FIO_DIR/reads.ini << EOF
 [global]
